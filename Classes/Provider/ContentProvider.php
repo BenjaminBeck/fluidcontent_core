@@ -100,6 +100,41 @@ class ContentProvider extends AbstractProvider implements ProviderInterface {
 	 * @return Form
 	 */
 	public function getForm(array $row) {
+		if (TYPO3_MODE == 'BE') {
+			$pid = $row['pid'];
+			if (
+				($pid < 0)
+				&& (
+					preg_match('/.*db_layout.php\?id=([0-9]+).*/', $_GET['returnUrl'], $matches)
+					|| preg_match('/.*db_new.php\?id=([0-9]+).*/', $_GET['returnUrl'], $matches)
+				)
+				&& isset($matches[1])
+				&& $matches[1]
+			) {
+				$pid = $matches[1];
+			}
+			$postIdWasSet = isset($_POST['id']);
+			if ($postIdWasSet) {
+				$postIdOrigValue = $_POST['id'];
+			}
+			$_POST['id'] = $pid;
+			$typoScript = $this->configurationManager->getConfiguration(ConfigurationManagerInterface::CONFIGURATION_TYPE_FULL_TYPOSCRIPT);
+			if ($postIdWasSet) {
+				$_POST['id'] = $postIdOrigValue;
+			} else {
+				unset($_POST['id']);
+			}
+		} else {
+			$typoScript = $this->configurationManager->getConfiguration(ConfigurationManagerInterface::CONFIGURATION_TYPE_FULL_TYPOSCRIPT);
+		}
+		$settings = (array) $typoScript['plugin.']['tx_fluidcontentcore.']['settings.'];
+		$paths = (array) $typoScript['plugin.']['tx_fluidcontentcore.']['view.'];
+		$this->templateVariables['settings'] = GeneralUtility::removeDotsFromTS($settings);
+		$paths = GeneralUtility::removeDotsFromTS($paths);
+		$paths = PathUtility::translatePath($paths);
+		$this->templatePaths = $paths;
+		$this->templatePathAndFilename = PathUtility::translatePath($settings['defaultTemplate']);
+
 		$form = parent::getForm($row);
 		$variables = $this->templateVariables;
 		$variables['record'] = $row;
@@ -165,20 +200,6 @@ class ContentProvider extends AbstractProvider implements ProviderInterface {
 		$paths = $this->configurationService->getViewConfigurationForExtensionName($extensionKey);
 		$templatePathAndFilename = rtrim($paths['templateRootPath'], '/') . '/CoreContent/' . ucfirst($contentType) . '.html';
 		return $templatePathAndFilename;
-	}
-
-	/**
-	 * @return void
-	 */
-	public function initializeObject() {
-		$typoScript = $this->configurationManager->getConfiguration(ConfigurationManagerInterface::CONFIGURATION_TYPE_FULL_TYPOSCRIPT);
-		$settings = (array) $typoScript['plugin.']['tx_fluidcontentcore.']['settings.'];
-		$paths = (array) $typoScript['plugin.']['tx_fluidcontentcore.']['view.'];
-		$this->templateVariables['settings'] = GeneralUtility::removeDotsFromTS($settings);
-		$paths = GeneralUtility::removeDotsFromTS($paths);
-		$paths = PathUtility::translatePath($paths);
-		$this->templatePaths = $paths;
-		$this->templatePathAndFilename = PathUtility::translatePath($settings['defaultTemplate']);
 	}
 
 	/**
